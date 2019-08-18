@@ -1,0 +1,16 @@
+PODS:
+  - ESTabBarController (0.2)
+
+DEPENDENCIES:
+  - ESTabBarController (= 0.2)
+
+SPEC REPOS:
+  https://github.com/cocoapods/specs.git:
+    - ESTabBarController
+
+SPEC CHECKSUMS:
+  ESTabBarController: e82ac0b135bec16fb646ac1da4ac8953fcd927da
+
+PODFILE CHECKSUM: cb16b855bdfbf054fcd4dd5adadc5cbac70f4d21
+
+COCOAPODS: 1.7.5
