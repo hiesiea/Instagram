@@ -18,6 +18,8 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
     // DatabaseのobserveEventの登録状態を表す
     var observing = false
     
+    var activityIndicator: UIActivityIndicatorView!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -46,7 +48,7 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 // 要素が追加されたらpostArrayに追加してTableViewを再表示する
                 let postsRef = Database.database().reference().child(Const.PostPath)
                 postsRef.observe(.childAdded, with: { snapshot in
-                    print("DEBUG_PRINT: .childAddedイベントが発生しました。")
+                    print("DEBUG_PRINT: postsRef.childAddedイベントが発生しました。")
                     
                     // PostDataクラスを生成して受け取ったデータを設定する
                     if let uid = Auth.auth().currentUser?.uid {
@@ -59,7 +61,7 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 })
                 // 要素が変更されたら該当のデータをpostArrayから一度削除した後に新しいデータを追加してTableViewを再表示する
                 postsRef.observe(.childChanged, with: { snapshot in
-                    print("DEBUG_PRINT: .childChangedイベントが発生しました。")
+                    print("DEBUG_PRINT: postsRef.childChangedイベントが発生しました。")
                     
                     if let uid = Auth.auth().currentUser?.uid {
                         // PostDataクラスを生成して受け取ったデータを設定する
@@ -74,8 +76,9 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                             }
                         }
                         
-                        // 差し替えるため一度削除する
-                        self.postArray.remove(at: index)
+                        // 差し替えるため一度削除する（コメントだけは残しておく）
+                        let comments = self.postArray.remove(at: index).comments
+                        postData.comments = comments
                         
                         // 削除したところに更新済みのデータを追加する
                         self.postArray.insert(postData, at: index)
@@ -83,6 +86,26 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                         // TableViewを再表示する
                         self.tableView.reloadData()
                     }
+                })
+                
+                // コメント更新
+                let commentsRef = Database.database().reference().child(Const.CommentPath)
+                commentsRef.observe(.childAdded, with: { snapshot in
+                    print("DEBUG_PRINT: commentsRef.childAddedイベントが発生しました。")
+                    let commentData = CommentData(snapshot: snapshot)
+                    
+                    // 対応する画像に対してコメントを追加する
+                    var index: Int = 0
+                    for post in self.postArray {
+                        if post.imageString == commentData.imageString {
+                            index = self.postArray.firstIndex(of: post)!
+                            break
+                        }
+                    }
+                    self.postArray[index].comments.append(commentData)
+                    
+                    // TableViewを再表示する
+                    self.tableView.reloadData()
                 })
                 
                 // DatabaseのobserveEventが上記コードにより登録されたため
@@ -95,9 +118,12 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 // テーブルをクリアする
                 postArray = []
                 tableView.reloadData()
+                
                 // オブザーバーを削除する
                 let postsRef = Database.database().reference().child(Const.PostPath)
                 postsRef.removeAllObservers()
+                let commentsRef = Database.database().reference().child(Const.CommentPath)
+                commentsRef.removeAllObservers()
                 
                 // DatabaseのobserveEventが上記コードにより解除されたため
                 // falseとする
@@ -116,13 +142,14 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
         cell.setPostData(postArray[indexPath.row])
         
         // セル内のボタンのアクションをソースコードで設定する
-        cell.likeButton.addTarget(self, action:#selector(handleButton(_:forEvent:)), for: .touchUpInside)
+        cell.likeButton.addTarget(self, action: #selector(handleLikeButton(_:forEvent:)), for: .touchUpInside)
+        cell.commentButton.addTarget(self, action: #selector(handleCommentButton(_:forEvent:)), for: .touchUpInside)
         
         return cell
     }
     
     // セル内のボタンがタップされた時に呼ばれるメソッド
-    @objc func handleButton(_ sender: UIButton, forEvent event: UIEvent) {
+    @objc private func handleLikeButton(_ sender: UIButton, forEvent event: UIEvent) {
         print("DEBUG_PRINT: likeボタンがタップされました。")
         
         // タップされたセルのインデックスを求める
@@ -158,4 +185,21 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
         }
     }
     
+    // セル内のボタンがタップされた時に呼ばれるメソッド
+    @objc private func handleCommentButton(_ sender: UIButton, forEvent event: UIEvent) {
+        print("DEBUG_PRINT: commentボタンがタップされました。")
+        
+        // タップされたセルのインデックスを求める
+        let touch = event.allTouches?.first
+        let point = touch!.location(in: self.tableView)
+        let indexPath = tableView.indexPathForRow(at: point)
+        
+        // 配列からタップされたインデックスのデータを取り出す
+        let postData = postArray[indexPath!.row]
+        
+        // imageStringを渡してコメント画面に遷移
+        let commentViewController = self.storyboard?.instantiateViewController(withIdentifier: "Comment") as! CommentViewController
+        commentViewController.imageString = postData.imageString
+        self.present(commentViewController, animated: true, completion: nil)
+    }
 }
